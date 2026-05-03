@@ -500,7 +500,7 @@ class PixiePanel {
             })
         );
     }
-    async _checkCodeErrors(document) {
+    async _checkCodeErrors(document, isRetry = false) {
         if (!this.groqClient || this.isBusy) return;
         // 30s cooldown between code comments — don't nag on every mistake
         if (Date.now() - this._lastCodeCommentAt < 30000) return;
@@ -513,7 +513,11 @@ class PixiePanel {
         for (const msg of this._lastReportedErrors) {
             if (!currentMessages.has(msg)) this._lastReportedErrors.delete(msg);
         }
-        if (!errors.length) return;
+        if (!errors.length) {
+            // LSP (e.g. Pylance) may not have finished analyzing yet — retry once after 3s
+            if (!isRetry) setTimeout(() => this._checkCodeErrors(document, true), 3000);
+            return;
+        }
         // Only react to errors we haven't already commented on
         const newErrors = errors.filter(e => !this._lastReportedErrors.has(e.message));
         if (!newErrors.length) return;
