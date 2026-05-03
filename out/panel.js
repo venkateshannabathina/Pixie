@@ -527,6 +527,13 @@ class PixiePanel {
         catch (e) {
             this.isBusy = false;
             this.postMessage({ type: 'SET_STATE', state: 'idle' });
+            if (e.message === 'TTS_TERMS_NOT_ACCEPTED') {
+                this.postMessage({ type: 'SHOW_ERROR', message: 'Accept Orpheus TTS terms at console.groq.com first.' });
+            } else if (e.message?.includes('429')) {
+                // rate limit — silent, will retry on next error
+            } else {
+                this.postMessage({ type: 'SHOW_ERROR', message: 'Code watcher error: ' + (e.message || 'unknown') });
+            }
         }
     }
     dispose() {

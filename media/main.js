@@ -1361,6 +1361,7 @@ function flashError(msg) {
 async function playAudio(base64Data) {
     if (!prefs.voiceEnabled) { vscode.postMessage({ type: 'TTS_DONE' }); return; }
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     const binary = atob(base64Data);
     const bytes = new Uint8Array(binary.length);
