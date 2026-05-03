@@ -474,18 +474,29 @@ class PixiePanel {
         this.isBusy = false;
     }
     _startCodeWatcher() {
-        // Only fire when the language server actually reports a diagnostic change —
-        // the text-change fallback was too aggressive (fired after every typing pause).
+        const scheduleCheck = (doc) => {
+            if (!this.groqClient || this.isBusy) return;
+            clearTimeout(this._codeWatchDebounce);
+            this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(doc), 1500);
+        };
+        // Primary: fires when language server updates diagnostics
         this._context.subscriptions.push(
             vscode.languages.onDidChangeDiagnostics(event => {
                 const editor = vscode.window.activeTextEditor;
                 if (!editor) return;
+                if (event.uris.some(u => u.fsPath === editor.document.uri.fsPath))
+                    scheduleCheck(editor.document);
+            })
+        );
+        // Fallback: for language servers that don't fire onDidChangeDiagnostics reliably.
+        // Uses a longer debounce so it only runs after the user stops typing.
+        this._context.subscriptions.push(
+            vscode.workspace.onDidChangeTextDocument(event => {
+                const editor = vscode.window.activeTextEditor;
+                if (!editor || editor.document.uri.fsPath !== event.document.uri.fsPath) return;
                 if (!this.groqClient || this.isBusy) return;
-                const editorUri = editor.document.uri.fsPath;
-                if (event.uris.some(u => u.fsPath === editorUri)) {
-                    clearTimeout(this._codeWatchDebounce);
-                    this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(editor.document), 1500);
-                }
+                clearTimeout(this._codeWatchDebounce);
+                this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(editor.document), 3000);
             })
         );
     }
@@ -494,15 +505,15 @@ class PixiePanel {
         // 30s cooldown between code comments — don't nag on every mistake
         if (Date.now() - this._lastCodeCommentAt < 30000) return;
         const diagnostics = vscode.languages.getDiagnostics(document.uri);
-        // Include Warning severity too — JS files report most issues as Warning, not Error
-        const errors = diagnostics.filter(d =>
-            d.severity === vscode.DiagnosticSeverity.Error ||
-            d.severity === vscode.DiagnosticSeverity.Warning
-        );
-        if (!errors.length) {
-            this._lastReportedErrors.clear();
-            return;
+        // Only Error severity — Warning is too noisy (ESLint style warnings fire constantly)
+        const errors = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+        // Remove resolved errors from tracked set so they re-trigger if they come back
+        // Don't clear() the whole set — that causes re-triggering on transient empty diagnostics
+        const currentMessages = new Set(errors.map(e => e.message));
+        for (const msg of this._lastReportedErrors) {
+            if (!currentMessages.has(msg)) this._lastReportedErrors.delete(msg);
         }
+        if (!errors.length) return;
         // Only react to errors we haven't already commented on
         const newErrors = errors.filter(e => !this._lastReportedErrors.has(e.message));
         if (!newErrors.length) return;
