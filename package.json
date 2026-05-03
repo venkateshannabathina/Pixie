@@ -1,0 +1,74 @@
+{
+  "name": "pixie",
+  "displayName": "Virtual Soul",
+  "description": "Voice Companion VS Code Extension",
+  "version": "0.1.0",
+  "icon": "icon.png",
+  "publisher": "VenkateshAnnabathina",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/venkateshannabathina/pixie.git"
+  },
+  "keywords": [
+    "voice",
+    "ai",
+    "companion",
+    "groq"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pixie-sidebar",
+          "title": "Pixie",
+          "icon": "icon.png"
+        }
+      ]
+    },
+    "views": {
+      "pixie-sidebar": [
+        {
+          "type": "webview",
+          "id": "pixie.view",
+          "name": "Pixie"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "pixie.start",
+        "title": "Pixie: Open"
+      }
+    ]
+  },
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "echo prepublish-skip",
+    "bundle": "esbuild media/vrm-scene-src.js --bundle --outfile=media/vrm-bundle.js --platform=browser --format=iife",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@pixiv/three-vrm": "^3.5.1",
+    "@pixiv/three-vrm-animation": "^3.5.1",
+    "groq-sdk": "^1.1.2",
+    "node-record-lpcm16": "^1.0.1",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.8",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.0.0"
+  }
+}

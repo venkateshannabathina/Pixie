@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none';
+             style-src 'unsafe-inline' {{cspSource}};
+             script-src 'nonce-{{nonce}}' {{cspSource}};
+             media-src blob: data:;
+             img-src data: blob: {{cspSource}};
+             connect-src blob: data: {{cspSource}} https:;
+             worker-src blob:;">
+    <title>Pixie</title>
+    <link rel="stylesheet" href="{{styleUri}}">
+</head>
+
+<body>
+    <div id="js-probe"
+        style="position:fixed;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#ef4444;z-index:9999;pointer-events:none;">
+    </div>
+    <div id="app"></div>
+
+    <!-- Three.js + @pixiv/three-vrm bundle -->
+    <script nonce="{{nonce}}" src="{{vrmBundleUri}}"></script>
+    <!-- Injected globals -->
+    <script nonce="{{nonce}}">window.__creatorUri = '{{creatorUri}}'; window.__backgroundUri = '{{backgroundUri}}';</script>
+    <!-- Main extension logic -->
+    <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
+</body>
+
+</html>
