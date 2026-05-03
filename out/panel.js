@@ -382,11 +382,19 @@ class PixiePanel {
     }
 
     async _checkCodeErrors(document, isRetry = false) {
-        if (this._pipeline !== 'idle' || !this.groqClient) return;
-        if (Date.now() - this._lastCodeCommentAt < 30000) return;
+        if (this._pipeline !== 'idle' || !this.groqClient) {
+            console.log('[Pixie] code check skipped — pipeline:', this._pipeline, 'client:', !!this.groqClient);
+            return;
+        }
+        const cooldownLeft = 30000 - (Date.now() - this._lastCodeCommentAt);
+        if (cooldownLeft > 0) {
+            console.log('[Pixie] code check skipped — cooldown', Math.ceil(cooldownLeft / 1000) + 's left');
+            return;
+        }
 
         const diagnostics = vscode.languages.getDiagnostics(document.uri);
         const errors = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+        console.log('[Pixie] check', document.fileName, '— total diags:', diagnostics.length, 'errors:', errors.length, 'retry:', isRetry);
 
         // Remove errors that have been resolved so they can re-trigger if they come back
         const currentMessages = new Set(errors.map(e => e.message));
