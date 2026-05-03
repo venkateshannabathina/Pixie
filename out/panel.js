@@ -61,7 +61,6 @@ class PixiePanel {
         this.groqClient = null;
         this.isBusy = false;
         this.recordingStartTime = 0;
-        this._turnCount = 0;
         this.secretManager = new secretManager_1.SecretManager(_context.secrets);
         this.audioCapture = new audioCapture_1.AudioCapture();
         fs.mkdirSync(_context.globalStorageUri.fsPath, { recursive: true });
@@ -208,6 +207,7 @@ class PixiePanel {
                     if (this.groqClient) {
                         this.groqClient.setMemory('');
                         this.groqClient.clearHistory();
+                        this.memoryManager.save('', []);
                     }
                     break;
                 case 'RESET_ALL':
@@ -342,10 +342,12 @@ class PixiePanel {
         try {
             this.groqClient = new groqClient_1.GroqClient(key);
             await this.groqClient.initialize();
-            // Load persisted memory into the client
-            const savedMemory = this.memoryManager.load();
-            if (savedMemory)
-                this.groqClient.setMemory(savedMemory);
+            // Restore both long-term summary and recent conversation history
+            const saved = this.memoryManager.load();
+            if (saved.compressed)
+                this.groqClient.setMemory(saved.compressed);
+            if (saved.recentHistory.length)
+                this.groqClient.conversationHistory = saved.recentHistory;
             this.postMessage({ type: 'SHOW_SCREEN', screen: 'VOICE_UI' });
         }
         catch (e) {
@@ -379,17 +381,13 @@ class PixiePanel {
                 this.postMessage({ type: 'LLM_WORD_CHUNK', word: wordBuffer });
             }
             this.postMessage({ type: 'LLM_DONE' });
-            // Compress memory every 3 turns — frequent enough to persist short sessions,
-            // infrequent enough to not hammer the API on every message
-            this._turnCount++;
-            if (this._turnCount % 3 === 0) {
-                const reply = this.groqClient.getLastResponse();
-                this.groqClient.compressMemory(text, reply).then(compressed => {
-                    this.memoryManager.save(compressed);
-                    this.groqClient.setMemory(compressed);
-                    this.postMessage({ type: 'MEMORY_UPDATED', summary: compressed });
-                }).catch(() => { });
-            }
+            // Save memory after every turn so even short sessions persist
+            this.memoryManager.save(this.groqClient.memory, this.groqClient.conversationHistory);
+            // If history is getting long, compress oldest messages into summary in background
+            this.groqClient.autoCompress((newSummary, keptHistory) => {
+                this.memoryManager.save(newSummary, keptHistory);
+                this.postMessage({ type: 'MEMORY_UPDATED', summary: newSummary });
+            });
             await this.handleTTS();
         }
         catch (e) {

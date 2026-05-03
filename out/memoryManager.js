@@ -44,15 +44,19 @@ class MemoryManager {
         try {
             if (fs.existsSync(this.filePath)) {
                 const data = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
-                return data.compressed || '';
+                return {
+                    compressed: data.compressed || '',
+                    recentHistory: Array.isArray(data.recentHistory) ? data.recentHistory : []
+                };
             }
         }
         catch { }
-        return '';
+        return { compressed: '', recentHistory: [] };
     }
-    save(compressed) {
+    save(compressed, recentHistory = []) {
         const data = {
             compressed,
+            recentHistory,
             updatedAt: new Date().toISOString()
         };
         fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2));

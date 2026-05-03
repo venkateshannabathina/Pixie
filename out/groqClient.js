@@ -119,50 +119,53 @@ Available tags: [emotion:joy] [emotion:excited] [emotion:fun] [emotion:smirk] [e
     getCleanResponse() {
         return this.parseEmotionTag(this.lastFullResponse).text;
     }
-    // Compress one conversation turn into the running memory string.
-    // Fires a small, fast LLM call — result is saved by the caller.
-    async compressMemory(userMsg, pixieReply) {
+    // When conversationHistory exceeds 8 messages (4 exchanges), compress the oldest
+    // half into the running memory summary and keep only the recent 4 messages verbatim.
+    // Runs in background — calls onSave(newSummary, keptHistory) when done.
+    autoCompress(onSave) {
+        const KEEP_RECENT = 4;
+        const COMPRESS_THRESHOLD = 8;
+        if (this.conversationHistory.length <= COMPRESS_THRESHOLD) return;
+        const toCompress = this.conversationHistory.slice(0, -KEEP_RECENT);
+        const remaining = this.conversationHistory.slice(-KEEP_RECENT);
+        const oldChat = toCompress
+            .map(m => `${m.role === 'user' ? 'User' : 'Pixie'}: ${m.content}`)
+            .join('\n');
         const existing = this.memory || 'none';
-        const result = await this.client.chat.completions.create({
+        this.client.chat.completions.create({
             model: 'llama-3.1-8b-instant',
             messages: [
                 {
                     role: 'system',
-                    content: `You compress conversation facts about a user into ultra-short memory tokens.
-Format rules:
-- Use key:value pairs separated by | (pipe)
-- Shorten names (Venkatesh → venky), times (9:30 → 930), activities to 2-4 chars
-- Merge new facts with existing memory — do NOT duplicate keys, update values if changed
-- Keep total output under 120 characters
-- Output ONLY the compressed memory string, nothing else
-
-Examples:
-Input existing: "none"
-Input chat: user said "I woke up at 9:30, went to school"
-Output: name:venky|wake:930|school:daily
-
-Input existing: "name:venky|wake:930|school:daily"
-Input chat: user said "I love rap music and got home at 5pm"
-Output: name:venky|wake:930|school:daily|home:5pm|music:rap`
+                    content: `You are a memory assistant. Merge the conversation below into the existing memory summary.
+Rules:
+- Keep it under 220 characters, plain English, no bullet points, no JSON.
+- Preserve names, preferences, facts, moods, and key topics.
+- If a fact changed (e.g. mood shifted), update it — don't duplicate.
+- Output ONLY the updated memory string.`
                 },
                 {
                     role: 'user',
-                    content: `Existing memory: ${existing}\nNew conversation:\nUser: ${userMsg}\nPixie: ${pixieReply}\n\nOutput compressed memory:`
+                    content: `Existing memory: ${existing}\n\nConversation to compress:\n${oldChat}\n\nUpdated memory:`
                 }
             ],
             stream: false,
-            max_tokens: 80
+            max_tokens: 130
+        }).then(result => {
+            const newSummary = (result.choices[0]?.message?.content || existing).trim();
+            this.memory = newSummary;
+            this.conversationHistory = remaining;
+            onSave(newSummary, remaining);
+        }).catch(() => {
+            // Compression failed — just trim history silently, keep existing summary
+            this.conversationHistory = remaining;
+            onSave(this.memory, remaining);
         });
-        return (result.choices[0]?.message?.content || existing).trim();
     }
     async *streamLLMResponse(userText) {
         this.lastFullResponse = '';
-        const memoryLine = this.memory ? `\nMEMORY ABOUT USER (use naturally, never recite verbatim): ${this.memory}` : '';
+        const memoryLine = this.memory ? `\nLONG-TERM MEMORY (use naturally, never recite verbatim): ${this.memory}` : '';
         const systemPrompt = this.buildSystemPrompt(memoryLine);
-        // Keep last 20 messages (10 exchanges) to avoid bloating the context
-        if (this.conversationHistory.length > 20) {
-            this.conversationHistory = this.conversationHistory.slice(-20);
-        }
         const stream = await this.client.chat.completions.create({
             model: this.model,
             messages: [
@@ -180,7 +183,6 @@ Output: name:venky|wake:930|school:daily|home:5pm|music:rap`
                 yield text;
             }
         }
-        // Append this exchange to history so future turns have context
         this.conversationHistory.push({ role: 'user', content: userText });
         this.conversationHistory.push({ role: 'assistant', content: this.lastFullResponse });
     }
