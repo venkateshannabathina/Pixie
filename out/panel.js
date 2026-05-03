@@ -474,31 +474,18 @@ class PixiePanel {
         this.isBusy = false;
     }
     _startCodeWatcher() {
-        const scheduleCheck = (doc) => {
-            if (!this.groqClient || this.isBusy) return;
-            clearTimeout(this._codeWatchDebounce);
-            this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(doc), 1500);
-        };
-        // Primary: fires when language server actually updates diagnostics
+        // Only fire when the language server actually reports a diagnostic change —
+        // the text-change fallback was too aggressive (fired after every typing pause).
         this._context.subscriptions.push(
             vscode.languages.onDidChangeDiagnostics(event => {
                 const editor = vscode.window.activeTextEditor;
                 if (!editor) return;
+                if (!this.groqClient || this.isBusy) return;
                 const editorUri = editor.document.uri.fsPath;
                 if (event.uris.some(u => u.fsPath === editorUri)) {
-                    scheduleCheck(editor.document);
+                    clearTimeout(this._codeWatchDebounce);
+                    this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(editor.document), 1500);
                 }
-            })
-        );
-        // Fallback: fires when user types — catches languages where onDidChangeDiagnostics
-        // is unreliable. 3s debounce gives the language server time to finish analysis.
-        this._context.subscriptions.push(
-            vscode.workspace.onDidChangeTextDocument(event => {
-                const editor = vscode.window.activeTextEditor;
-                if (!editor || editor.document.uri.fsPath !== event.document.uri.fsPath) return;
-                if (!this.groqClient || this.isBusy) return;
-                clearTimeout(this._codeWatchDebounce);
-                this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(editor.document), 3000);
             })
         );
     }
