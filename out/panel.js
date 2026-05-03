@@ -447,13 +447,20 @@ class PixiePanel {
         this.isBusy = false;
     }
     _startCodeWatcher() {
+        // onDidChangeDiagnostics fires when the language server actually updates errors —
+        // more reliable than onDidChangeTextDocument which fires before TS/ESLint finishes analysis
         this._context.subscriptions.push(
-            vscode.workspace.onDidChangeTextDocument(event => {
+            vscode.languages.onDidChangeDiagnostics(event => {
                 if (!this.groqClient || this.isBusy) return;
+                const activeEditor = vscode.window.activeTextEditor;
+                if (!activeEditor) return;
+                // Only care if the changed diagnostics include the active file
+                const affected = event.uris.some(u => u.toString() === activeEditor.document.uri.toString());
+                if (!affected) return;
                 clearTimeout(this._codeWatchDebounce);
                 this._codeWatchDebounce = setTimeout(() => {
-                    this._checkCodeErrors(event.document);
-                }, 2500);
+                    this._checkCodeErrors(activeEditor.document);
+                }, 800);
             })
         );
     }
@@ -489,9 +496,10 @@ class PixiePanel {
                 this.postMessage({ type: 'SET_STATE', state: 'idle' });
                 return;
             }
-            const { emotion } = this.groqClient.parseEmotionTag(comment);
-            this.postMessage({ type: 'PIXIE_SAID', text: comment, emotion });
-            const audioBuffer = await this.groqClient.synthesizeSpeech(comment);
+            const { text: cleanComment, emotion } = this.groqClient.parseEmotionTag(comment);
+            this.postMessage({ type: 'PIXIE_SAID', text: cleanComment, emotion });
+            // Pass clean text to TTS — raw comment has [emotion:X] tag which would be spoken aloud
+            const audioBuffer = await this.groqClient.synthesizeSpeech(cleanComment);
             const audioBase64 = audioBuffer.toString('base64');
             this.postMessage({ type: 'PLAY_AUDIO', audioBase64, mimeType: 'audio/wav' });
             this._busyTimeout = setTimeout(() => {
