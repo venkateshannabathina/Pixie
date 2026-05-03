@@ -195,16 +195,20 @@ Rules:
             onSave(this.memory, this.conversationHistory);
         });
     }
-    async *streamLLMResponse(userText) {
+    async *streamLLMResponse(userText, codeContext = null) {
         this.lastFullResponse = '';
         const memoryLine = this.memory ? `\nLONG-TERM MEMORY (use naturally, never recite verbatim): ${this.memory}` : '';
         const systemPrompt = this.buildSystemPrompt(memoryLine);
+        // Inject active editor code into the message — never stored in history so it stays fresh each turn
+        const messageContent = codeContext
+            ? `${userText}\n\n---\n[Active file: ${codeContext.label}]\n\`\`\`${codeContext.lang}\n${codeContext.code}\n\`\`\``
+            : userText;
         const stream = await this.client.chat.completions.create({
             model: this.model,
             messages: [
                 { role: 'system', content: systemPrompt },
                 ...this.conversationHistory,
-                { role: 'user', content: userText }
+                { role: 'user', content: messageContent }
             ],
             stream: true,
             max_tokens: 150
@@ -216,8 +220,8 @@ Rules:
                 yield text;
             }
         }
+        // Store only the clean user question — not the code blob — so history stays lean
         this.conversationHistory.push({ role: 'user', content: userText });
-        // Store clean text — strip emotion tags so they don't pollute future prompts
         this.conversationHistory.push({ role: 'assistant', content: this.getCleanResponse() });
     }
     getLastResponse() {

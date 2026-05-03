@@ -367,11 +367,33 @@ class PixiePanel {
     async showLoadingScreen() {
         this.postMessage({ type: 'SHOW_SCREEN', screen: 'LOADING' });
     }
+    _getEditorContext() {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return null;
+        const doc = editor.document;
+        const sel = editor.selection;
+        const fileName = path.basename(doc.fileName);
+        const lang = doc.languageId;
+        let code, label;
+        if (!sel.isEmpty) {
+            code = doc.getText(sel);
+            label = `${fileName} — selected lines ${sel.start.line + 1}–${sel.end.line + 1}`;
+        } else {
+            const cursor = sel.active.line;
+            const start = Math.max(0, cursor - 60);
+            const end = Math.min(doc.lineCount - 1, cursor + 60);
+            code = doc.getText(new vscode.Range(start, 0, end, doc.lineAt(end).text.length));
+            label = `${fileName} — lines ${start + 1}–${end + 1}, cursor at line ${cursor + 1}`;
+        }
+        if (code.length > 8000) code = code.slice(0, 8000) + '\n... (truncated)';
+        return { label, lang, code };
+    }
     async handleUserTranscript(text) {
         if (!this.groqClient)
             return;
+        const codeContext = this._getEditorContext();
         try {
-            const generator = this.groqClient.streamLLMResponse(text);
+            const generator = this.groqClient.streamLLMResponse(text, codeContext);
             let wordBuffer = '';
             for await (const chunk of generator) {
                 wordBuffer += chunk;
