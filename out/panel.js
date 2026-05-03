@@ -447,20 +447,31 @@ class PixiePanel {
         this.isBusy = false;
     }
     _startCodeWatcher() {
-        // onDidChangeDiagnostics fires when the language server actually updates errors —
-        // more reliable than onDidChangeTextDocument which fires before TS/ESLint finishes analysis
+        const scheduleCheck = (doc) => {
+            if (!this.groqClient || this.isBusy) return;
+            clearTimeout(this._codeWatchDebounce);
+            this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(doc), 1500);
+        };
+        // Primary: fires when language server actually updates diagnostics
         this._context.subscriptions.push(
             vscode.languages.onDidChangeDiagnostics(event => {
+                const editor = vscode.window.activeTextEditor;
+                if (!editor) return;
+                const editorUri = editor.document.uri.fsPath;
+                if (event.uris.some(u => u.fsPath === editorUri)) {
+                    scheduleCheck(editor.document);
+                }
+            })
+        );
+        // Fallback: fires when user types — catches languages where onDidChangeDiagnostics
+        // is unreliable. 3s debounce gives the language server time to finish analysis.
+        this._context.subscriptions.push(
+            vscode.workspace.onDidChangeTextDocument(event => {
+                const editor = vscode.window.activeTextEditor;
+                if (!editor || editor.document.uri.fsPath !== event.document.uri.fsPath) return;
                 if (!this.groqClient || this.isBusy) return;
-                const activeEditor = vscode.window.activeTextEditor;
-                if (!activeEditor) return;
-                // Only care if the changed diagnostics include the active file
-                const affected = event.uris.some(u => u.toString() === activeEditor.document.uri.toString());
-                if (!affected) return;
                 clearTimeout(this._codeWatchDebounce);
-                this._codeWatchDebounce = setTimeout(() => {
-                    this._checkCodeErrors(activeEditor.document);
-                }, 800);
+                this._codeWatchDebounce = setTimeout(() => this._checkCodeErrors(editor.document), 3000);
             })
         );
     }
@@ -469,7 +480,11 @@ class PixiePanel {
         // 30s cooldown between code comments — don't nag on every mistake
         if (Date.now() - this._lastCodeCommentAt < 30000) return;
         const diagnostics = vscode.languages.getDiagnostics(document.uri);
-        const errors = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+        // Include Warning severity too — JS files report most issues as Warning, not Error
+        const errors = diagnostics.filter(d =>
+            d.severity === vscode.DiagnosticSeverity.Error ||
+            d.severity === vscode.DiagnosticSeverity.Warning
+        );
         if (!errors.length) {
             this._lastReportedErrors.clear();
             return;
