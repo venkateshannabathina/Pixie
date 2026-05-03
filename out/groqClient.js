@@ -104,6 +104,39 @@ Available tags: [emotion:joy] [emotion:excited] [emotion:fun] [emotion:smirk] [e
             throw new Error(`Init failed: ${error.message}`);
         }
     }
+    async getCodeComment(errorMsg, codeSnippet) {
+        const name = this.companionName;
+        let persona;
+        switch (this.personality) {
+            case 'meanie':
+                persona = `You are ${name} — brutally mean, zero filter. The user wrote broken code. Roast them hard. Call out EXACTLY what's wrong. Swear casually. Be specific. Max 2 sentences. End with [emotion:angry] or [emotion:smirk].`;
+                break;
+            case 'sarcastic':
+                persona = `You are ${name} — magnificently sarcastic. React to the user's coding mistake with devastating dry wit. Be specific about the error. Max 2 sentences. End with [emotion:smirk].`;
+                break;
+            case 'casual':
+                persona = `You are ${name} — chill bestie. Call out the coding mistake like a friend who just noticed. Keep it real and simple. Max 2 sentences. End with [emotion:fun].`;
+                break;
+            case 'professional':
+                persona = `You are ${name} — precise and professional. State the coding error and the correct fix concisely. No fluff. Max 2 sentences. End with [emotion:calm].`;
+                break;
+            case 'innocent':
+                persona = `You are ${name} — sweet and a little confused. Notice the coding mistake with gentle curiosity. Suggest what might be right. Max 2 sentences. End with [emotion:question].`;
+                break;
+            default:
+                persona = `You are ${name} — warm and helpful. Point out the coding mistake kindly and tell them how to fix it. Max 2 sentences. End with [emotion:empathetic].`;
+        }
+        const result = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [
+                { role: 'system', content: persona },
+                { role: 'user', content: `User's code (>>> marks the error line):\n${codeSnippet}\n\nError: ${errorMsg}\n\nReact to this mistake in character.` }
+            ],
+            stream: false,
+            max_tokens: 80
+        });
+        return (result.choices[0]?.message?.content || '').trim();
+    }
     // Extract [emotion:X] tag from end of text. Returns { text, emotion }.
     parseEmotionTag(raw) {
         const match = raw.match(/\[emotion:(\w+)\]\s*$/i);

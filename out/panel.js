@@ -61,6 +61,10 @@ class PixiePanel {
         this.groqClient = null;
         this.isBusy = false;
         this.recordingStartTime = 0;
+        this._codeWatchDebounce = null;
+        this._lastReportedErrors = new Set();
+        this._lastCodeCommentAt = 0;
+        this._codeWatcherStarted = false;
         this.secretManager = new secretManager_1.SecretManager(_context.secrets);
         this.audioCapture = new audioCapture_1.AudioCapture();
         fs.mkdirSync(_context.globalStorageUri.fsPath, { recursive: true });
@@ -78,6 +82,10 @@ class PixiePanel {
         };
         this._updateHtml();
         webviewView.webview.onDidReceiveMessage(async (msg) => this.handleMessage(msg));
+        if (!this._codeWatcherStarted) {
+            this._codeWatcherStarted = true;
+            this._startCodeWatcher();
+        }
     }
     postMessage(msg) {
         this._view?.webview.postMessage(msg);
@@ -437,6 +445,66 @@ class PixiePanel {
         this.postMessage({ type: 'ERROR', message });
         this.postMessage({ type: 'SET_STATE', state: 'error' });
         this.isBusy = false;
+    }
+    _startCodeWatcher() {
+        this._context.subscriptions.push(
+            vscode.workspace.onDidChangeTextDocument(event => {
+                if (!this.groqClient || this.isBusy) return;
+                clearTimeout(this._codeWatchDebounce);
+                this._codeWatchDebounce = setTimeout(() => {
+                    this._checkCodeErrors(event.document);
+                }, 2500);
+            })
+        );
+    }
+    async _checkCodeErrors(document) {
+        if (!this.groqClient || this.isBusy) return;
+        // 30s cooldown between code comments — don't nag on every mistake
+        if (Date.now() - this._lastCodeCommentAt < 30000) return;
+        const diagnostics = vscode.languages.getDiagnostics(document.uri);
+        const errors = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+        if (!errors.length) {
+            this._lastReportedErrors.clear();
+            return;
+        }
+        // Only react to errors we haven't already commented on
+        const newErrors = errors.filter(e => !this._lastReportedErrors.has(e.message));
+        if (!newErrors.length) return;
+        const error = newErrors[0];
+        this._lastReportedErrors.add(error.message);
+        this._lastCodeCommentAt = Date.now();
+        // Build code snippet: 2 lines above and below the error line, >>> marks the error
+        const line = error.range.start.line;
+        const snippetLines = [];
+        for (let i = Math.max(0, line - 2); i <= Math.min(document.lineCount - 1, line + 2); i++) {
+            snippetLines.push(`${i === line ? '>>>' : '   '} ${document.lineAt(i).text}`);
+        }
+        const snippet = snippetLines.join('\n');
+        this.isBusy = true;
+        this.postMessage({ type: 'SET_STATE', state: 'speaking' });
+        try {
+            const comment = await this.groqClient.getCodeComment(error.message, snippet);
+            if (!comment.trim()) {
+                this.isBusy = false;
+                this.postMessage({ type: 'SET_STATE', state: 'idle' });
+                return;
+            }
+            const { emotion } = this.groqClient.parseEmotionTag(comment);
+            this.postMessage({ type: 'PIXIE_SAID', text: comment, emotion });
+            const audioBuffer = await this.groqClient.synthesizeSpeech(comment);
+            const audioBase64 = audioBuffer.toString('base64');
+            this.postMessage({ type: 'PLAY_AUDIO', audioBase64, mimeType: 'audio/wav' });
+            this._busyTimeout = setTimeout(() => {
+                if (this.isBusy) {
+                    this.isBusy = false;
+                    this.postMessage({ type: 'SET_STATE', state: 'idle' });
+                }
+            }, 60000);
+        }
+        catch (e) {
+            this.isBusy = false;
+            this.postMessage({ type: 'SET_STATE', state: 'idle' });
+        }
     }
     dispose() {
         this.audioCapture.stopRecording().catch(() => {});
