@@ -10,7 +10,7 @@ const prefs = {
     set firstTimeDone(v) { pset('ftd', v ? '1' : '0'); },
     get companion() { return pget('companion', 'pixie'); },
     set companion(v) { pset('companion', v); },
-    get companionName() { return pget('cname', 'Pixie'); },
+    get companionName() { return pget('cname', 'Yuriko'); },
     set companionName(v) { pset('cname', v); },
     get customVrmName() { return pget('customVrmName', ''); },
     set customVrmName(v) { pset('customVrmName', v); },
@@ -105,18 +105,18 @@ function applyWallpaper(dataUrl) {
 // ─── COMPANIONS ───────────────────────────────────────────────────────────────
 const COMPANIONS = [
     {
-        id: 'pixie', name: 'Pixie', file: 'female.vrm',
+        id: 'pixie', name: 'Yuriko', file: 'female.vrm',
         gradient: 'linear-gradient(145deg,#fce4e4 0%,#f5b8b8 55%,#e88080 100%)'
     },
 ];
 
 const PERSONALITIES = [
-    { id: 'friendly',     label: 'Friendly',      desc: 'Warm, caring, loves to chat',          color: '#da7756' },
-    { id: 'casual',       label: 'Casual',         desc: 'Chill bestie, real talk always',        color: '#22c55e' },
-    { id: 'sarcastic',    label: 'Sarcastic',      desc: 'Dry wit, sharp tongue',                 color: '#7b68ee' },
-    { id: 'professional', label: 'Professional',   desc: 'Sharp, direct, no-nonsense',            color: '#4a90d9' },
-    { id: 'meanie',       label: 'Meanie',         desc: 'Zero filter, will judge everything',    color: '#e8453c' },
-    { id: 'innocent',     label: 'Innocent',       desc: 'Pure, sweet, sees the best in all',     color: '#f59e0b' },
+    { id: 'friendly',     label: 'Friendly',      desc: 'Warm, caring, genuinely excited for you',     color: '#da7756' },
+    { id: 'casual',       label: 'Casual',         desc: 'Chill bestie, talks like a text message',     color: '#22c55e' },
+    { id: 'sarcastic',    label: 'Sarcastic',      desc: 'Perpetually unimpressed, devastatingly dry',  color: '#7b68ee' },
+    { id: 'professional', label: 'Professional',   desc: 'Formal, precise, strictly business',          color: '#4a90d9' },
+    { id: 'meanie',       label: 'Meanie',         desc: 'Genuinely mean, zero patience, will roast',   color: '#e8453c' },
+    { id: 'innocent',     label: 'Innocent',       desc: 'Pure, sweet, wonderfully naive',              color: '#f59e0b' },
 ];
 
 // ─── COMPANION PROFILES ───────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ function getProfile(id) {
     const stored = getProfiles()[id];
     if (stored) return stored;
     const DEFAULTS = {
-        pixie: { name: 'Pixie', personality: 'friendly', gradient: 'linear-gradient(145deg,#fce4e4 0%,#f5b8b8 55%,#e88080 100%)' }
+        pixie: { name: 'Yuriko', personality: 'friendly', gradient: 'linear-gradient(145deg,#fce4e4 0%,#f5b8b8 55%,#e88080 100%)' }
     };
     return DEFAULTS[id] || { name: id, personality: 'friendly', gradient: 'linear-gradient(145deg,#e4eefc 0%,#b8cef5 55%,#80a0e8 100%)' };
 }
@@ -837,7 +837,7 @@ function renderCompanionTab(el) {
     <button id="ss-clear-mem" class="ss-danger-btn" ${!memHasData() ? 'disabled' : ''}>Clear memory</button>`;
 
     el.querySelector('#ss-cname').addEventListener('change', e => {
-        prefs.companionName = e.target.value.trim() || 'Pixie';
+        prefs.companionName = e.target.value.trim() || 'Yuriko';
         saveCurrentProfile();
         syncSettings();
     });
