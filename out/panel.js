@@ -205,8 +205,10 @@ class PixiePanel {
                     break;
                 case 'CLEAR_MEMORY':
                     this.memoryManager.clear();
-                    if (this.groqClient)
+                    if (this.groqClient) {
                         this.groqClient.setMemory('');
+                        this.groqClient.clearHistory();
+                    }
                     break;
                 case 'RESET_ALL':
                     await this.secretManager.clearGroqKey();
@@ -377,9 +379,10 @@ class PixiePanel {
                 this.postMessage({ type: 'LLM_WORD_CHUNK', word: wordBuffer });
             }
             this.postMessage({ type: 'LLM_DONE' });
-            // Compress memory every 5 turns to avoid hammering the API on every message
+            // Compress memory every 3 turns — frequent enough to persist short sessions,
+            // infrequent enough to not hammer the API on every message
             this._turnCount++;
-            if (this._turnCount % 5 === 0) {
+            if (this._turnCount % 3 === 0) {
                 const reply = this.groqClient.getLastResponse();
                 this.groqClient.compressMemory(text, reply).then(compressed => {
                     this.memoryManager.save(compressed);
@@ -411,7 +414,7 @@ class PixiePanel {
             }
             // Send full Pixie reply to display in chat (clean text + detected emotion)
             const emotion = this.groqClient.getLastEmotion();
-            this.postMessage({ type: 'YURIKO_SAID', text: fullText, emotion });
+            this.postMessage({ type: 'PIXIE_SAID', text: fullText, emotion });
             const audioBuffer = await this.groqClient.synthesizeSpeech(fullText);
             const audioBase64 = audioBuffer.toString('base64');
             this.postMessage({ type: 'PLAY_AUDIO', audioBase64, mimeType: 'audio/wav' });

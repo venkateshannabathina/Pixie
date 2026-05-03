@@ -1466,7 +1466,7 @@ window.addEventListener('message', async (e) => {
         case 'LLM_DONE':
             break;
 
-        case 'YURIKO_SAID':
+        case 'PIXIE_SAID':
             memAdd('pixie', msg.text);
             if (window.PixieVRM) {
                 const emotion = msg.emotion || analyzeSentiment(msg.text);

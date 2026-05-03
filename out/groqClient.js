@@ -44,6 +44,7 @@ class GroqClient {
         this.apiKey = apiKey;
         this.lastFullResponse = '';
         this.memory = '';
+        this.conversationHistory = [];
         this.voiceName = 'diana';
         this.model = 'llama-3.3-70b-versatile';
         this.companionName = 'Pixie';
@@ -52,6 +53,9 @@ class GroqClient {
     }
     setMemory(compressed) {
         this.memory = compressed;
+    }
+    clearHistory() {
+        this.conversationHistory = [];
     }
     updateSettings(s) {
         if (s.voiceName)
@@ -155,10 +159,15 @@ Output: name:venky|wake:930|school:daily|home:5pm|music:rap`
         this.lastFullResponse = '';
         const memoryLine = this.memory ? `\nMEMORY ABOUT USER (use naturally, never recite verbatim): ${this.memory}` : '';
         const systemPrompt = this.buildSystemPrompt(memoryLine);
+        // Keep last 20 messages (10 exchanges) to avoid bloating the context
+        if (this.conversationHistory.length > 20) {
+            this.conversationHistory = this.conversationHistory.slice(-20);
+        }
         const stream = await this.client.chat.completions.create({
             model: this.model,
             messages: [
                 { role: 'system', content: systemPrompt },
+                ...this.conversationHistory,
                 { role: 'user', content: userText }
             ],
             stream: true,
@@ -171,6 +180,9 @@ Output: name:venky|wake:930|school:daily|home:5pm|music:rap`
                 yield text;
             }
         }
+        // Append this exchange to history so future turns have context
+        this.conversationHistory.push({ role: 'user', content: userText });
+        this.conversationHistory.push({ role: 'assistant', content: this.lastFullResponse });
     }
     getLastResponse() {
         return this.getCleanResponse();
