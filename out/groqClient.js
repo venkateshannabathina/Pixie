@@ -127,7 +127,9 @@ Available tags: [emotion:joy] [emotion:excited] [emotion:fun] [emotion:smirk] [e
         const COMPRESS_THRESHOLD = 8;
         if (this.conversationHistory.length <= COMPRESS_THRESHOLD) return;
         const toCompress = this.conversationHistory.slice(0, -KEEP_RECENT);
-        const remaining = this.conversationHistory.slice(-KEEP_RECENT);
+        // Trim history SYNCHRONOUSLY before any async work — prevents a race where
+        // a new turn's messages get wiped if the LLM call finishes after they were added.
+        this.conversationHistory = this.conversationHistory.slice(-KEEP_RECENT);
         const oldChat = toCompress
             .map(m => `${m.role === 'user' ? 'User' : 'Pixie'}: ${m.content}`)
             .join('\n');
@@ -154,12 +156,10 @@ Rules:
         }).then(result => {
             const newSummary = (result.choices[0]?.message?.content || existing).trim();
             this.memory = newSummary;
-            this.conversationHistory = remaining;
-            onSave(newSummary, remaining);
+            // Pass current history (may include new turns added after trim)
+            onSave(newSummary, this.conversationHistory);
         }).catch(() => {
-            // Compression failed — just trim history silently, keep existing summary
-            this.conversationHistory = remaining;
-            onSave(this.memory, remaining);
+            onSave(this.memory, this.conversationHistory);
         });
     }
     async *streamLLMResponse(userText) {
@@ -184,7 +184,8 @@ Rules:
             }
         }
         this.conversationHistory.push({ role: 'user', content: userText });
-        this.conversationHistory.push({ role: 'assistant', content: this.lastFullResponse });
+        // Store clean text — strip emotion tags so they don't pollute future prompts
+        this.conversationHistory.push({ role: 'assistant', content: this.getCleanResponse() });
     }
     getLastResponse() {
         return this.getCleanResponse();
