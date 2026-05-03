@@ -409,7 +409,7 @@ class PixiePanel {
                 this.isBusy = false;
                 return;
             }
-            // Send full Yuriko reply to display in chat (clean text + detected emotion)
+            // Send full Pixie reply to display in chat (clean text + detected emotion)
             const emotion = this.groqClient.getLastEmotion();
             this.postMessage({ type: 'YURIKO_SAID', text: fullText, emotion });
             const audioBuffer = await this.groqClient.synthesizeSpeech(fullText);

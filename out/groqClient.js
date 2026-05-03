@@ -46,7 +46,7 @@ class GroqClient {
         this.memory = '';
         this.voiceName = 'diana';
         this.model = 'llama-3.3-70b-versatile';
-        this.companionName = 'Yuriko';
+        this.companionName = 'Pixie';
         this.personality = 'friendly';
         this.client = new groq_sdk_1.default({ apiKey, dangerouslyAllowBrowser: false });
     }
@@ -117,7 +117,7 @@ Available tags: [emotion:joy] [emotion:excited] [emotion:fun] [emotion:smirk] [e
     }
     // Compress one conversation turn into the running memory string.
     // Fires a small, fast LLM call — result is saved by the caller.
-    async compressMemory(userMsg, yurikoReply) {
+    async compressMemory(userMsg, pixieReply) {
         const existing = this.memory || 'none';
         const result = await this.client.chat.completions.create({
             model: 'llama-3.1-8b-instant',
@@ -143,7 +143,7 @@ Output: name:venky|wake:930|school:daily|home:5pm|music:rap`
                 },
                 {
                     role: 'user',
-                    content: `Existing memory: ${existing}\nNew conversation:\nUser: ${userMsg}\nYuriko: ${yurikoReply}\n\nOutput compressed memory:`
+                    content: `Existing memory: ${existing}\nNew conversation:\nUser: ${userMsg}\nPixie: ${pixieReply}\n\nOutput compressed memory:`
                 }
             ],
             stream: false,

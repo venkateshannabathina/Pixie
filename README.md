@@ -6,7 +6,7 @@
 
 <br><br>
 
-# Panda — Voice Companion
+# Pixie — Voice Companion
 
 **A living 3D AI companion inside VS Code.**  
 She talks, reacts, remembers, and has real personality.

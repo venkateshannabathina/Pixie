@@ -8,9 +8,9 @@ function pset(k, v) { localStorage.setItem('pixie_' + k, String(v)); }
 const prefs = {
     get firstTimeDone() { return pget('ftd', '0') === '1'; },
     set firstTimeDone(v) { pset('ftd', v ? '1' : '0'); },
-    get companion() { return pget('companion', 'yuriko'); },
+    get companion() { return pget('companion', 'pixie'); },
     set companion(v) { pset('companion', v); },
-    get companionName() { return pget('cname', 'Yuriko'); },
+    get companionName() { return pget('cname', 'Pixie'); },
     set companionName(v) { pset('cname', v); },
     get customVrmName() { return pget('customVrmName', ''); },
     set customVrmName(v) { pset('customVrmName', v); },
@@ -105,7 +105,7 @@ function applyWallpaper(dataUrl) {
 // ─── COMPANIONS ───────────────────────────────────────────────────────────────
 const COMPANIONS = [
     {
-        id: 'yuriko', name: 'Yuriko', file: 'female.vrm',
+        id: 'pixie', name: 'Pixie', file: 'female.vrm',
         gradient: 'linear-gradient(145deg,#fce4e4 0%,#f5b8b8 55%,#e88080 100%)'
     },
 ];
@@ -128,7 +128,7 @@ function getProfile(id) {
     const stored = getProfiles()[id];
     if (stored) return stored;
     const DEFAULTS = {
-        yuriko: { name: 'Yuriko', personality: 'friendly', gradient: 'linear-gradient(145deg,#fce4e4 0%,#f5b8b8 55%,#e88080 100%)' }
+        pixie: { name: 'Pixie', personality: 'friendly', gradient: 'linear-gradient(145deg,#fce4e4 0%,#f5b8b8 55%,#e88080 100%)' }
     };
     return DEFAULTS[id] || { name: id, personality: 'friendly', gradient: 'linear-gradient(145deg,#e4eefc 0%,#b8cef5 55%,#80a0e8 100%)' };
 }
@@ -579,8 +579,8 @@ function buildShell() {
     document.getElementById('reset-confirm').addEventListener('click', confirmReset);
     document.getElementById('zoom-btn').addEventListener('click', () => {
         const btn = document.getElementById('zoom-btn');
-        if (!window.YurikoVRM) return;
-        const state = window.YurikoVRM.toggleZoom();
+        if (!window.PixieVRM) return;
+        const state = window.PixieVRM.toggleZoom();
         btn.dataset.zoom = state;
     });
     document.getElementById('theme-btn').addEventListener('click', () => {
@@ -837,7 +837,7 @@ function renderCompanionTab(el) {
     <button id="ss-clear-mem" class="ss-danger-btn" ${!memHasData() ? 'disabled' : ''}>Clear memory</button>`;
 
     el.querySelector('#ss-cname').addEventListener('change', e => {
-        prefs.companionName = e.target.value.trim() || 'Yuriko';
+        prefs.companionName = e.target.value.trim() || 'Pixie';
         saveCurrentProfile();
         syncSettings();
     });
@@ -1185,18 +1185,18 @@ function initVRM() {
     if (!canvas || !viewport) return;
     canvas.width = viewport.clientWidth || 300;
     canvas.height = viewport.clientHeight || 480;
-    if (window.YurikoVRM) window.YurikoVRM.init(canvas);
+    if (window.PixieVRM) window.PixieVRM.init(canvas);
     vscode.postMessage({ type: 'REQUEST_VRM', companion: prefs.companion });
 }
 
 async function loadVRM(vrmUri, vrmaUri, animations) {
-    if (!window.YurikoVRM) return;
+    if (!window.PixieVRM) return;
     if (animations) vrmAnimations = animations;
     const loadingEl = document.getElementById('vrm-loading');
     try {
-        await window.YurikoVRM.load(vrmUri);
+        await window.PixieVRM.load(vrmUri);
         if (loadingEl) loadingEl.style.display = 'none';
-        if (vrmaUri) await window.YurikoVRM.loadAnimation(vrmaUri);
+        if (vrmaUri) await window.PixieVRM.loadAnimation(vrmaUri);
     } catch (err) {
         console.error('VRM load failed:', err);
         if (loadingEl) { const pct = loadingEl.querySelector('#vrm-pct'); if (pct) pct.textContent = 'model load failed'; }
@@ -1243,7 +1243,7 @@ function setUIState(state) {
     const app = document.getElementById('app');
     if (app) app.dataset.state = state;
     VoiceWave.setMode(state);
-    if (window.YurikoVRM) window.YurikoVRM.setExpression(state);
+    if (window.PixieVRM) window.PixieVRM.setExpression(state);
 }
 
 // ─── VOICE ORB (rotating petal flower) ───────────────────────────────────────
@@ -1387,13 +1387,13 @@ async function playAudio(base64Data) {
             let sum = 0;
             for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128.0; sum += v * v; }
             const rms = Math.sqrt(sum / data.length);
-            if (window.YurikoVRM) window.YurikoVRM.setLipSync(rms);
+            if (window.PixieVRM) window.PixieVRM.setLipSync(rms);
             if (isPlaying) requestAnimationFrame(tick);
         }
 
         source.onended = () => {
             isPlaying = false;
-            if (window.YurikoVRM) window.YurikoVRM.setLipSync(0);
+            if (window.PixieVRM) window.PixieVRM.setLipSync(0);
             VoiceWave.bindAnalyser(null);
             vscode.postMessage({ type: 'TTS_DONE' });
         };
@@ -1427,7 +1427,7 @@ window.addEventListener('message', async (e) => {
             isBusy = msg.state !== 'idle' && msg.state !== 'error';
             if (msg.state === 'idle' || msg.state === 'error') _startListeningSent = false;
             setUIState(msg.state);
-            if (msg.state === 'idle' && window.YurikoVRM) window.YurikoVRM.setSentiment(null);
+            if (msg.state === 'idle' && window.PixieVRM) window.PixieVRM.setSentiment(null);
             break;
 
         case 'LOAD_VRM':
@@ -1467,10 +1467,10 @@ window.addEventListener('message', async (e) => {
             break;
 
         case 'YURIKO_SAID':
-            memAdd('yuriko', msg.text);
-            if (window.YurikoVRM) {
+            memAdd('pixie', msg.text);
+            if (window.PixieVRM) {
                 const emotion = msg.emotion || analyzeSentiment(msg.text);
-                window.YurikoVRM.setSentiment(emotion);
+                window.PixieVRM.setSentiment(emotion);
             }
             break;
 

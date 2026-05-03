@@ -43373,7 +43373,7 @@ void main() {
     ),
     error: () => new Vector3(-0.1, 1.18, 2.5)
   };
-  var YurikoVRM = {
+  var PixieVRM = {
     scene: null,
     camera: null,
     renderer: null,
@@ -43897,7 +43897,7 @@ void main() {
       this._lipRaw = clamp2(amplitude * 3.2, 0, 1);
     }
   };
-  window.YurikoVRM = YurikoVRM;
+  window.PixieVRM = PixieVRM;
 })();
 /*! Bundled license information:
 
